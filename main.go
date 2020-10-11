@@ -161,15 +161,24 @@ func serialize(input interface{}) (string, error) {
 
 	switch inputVal := input.(type) {
 	case []interface{}:
-		for _, v := range inputVal {
+		inputLen := len(inputVal)
+
+		for i, v := range inputVal {
 			val, err := serialize(v)
 			if err != nil {
 				return "", err
 			}
 
-			_, err = str.WriteString(val)
-			if err != nil {
-				return "", err
+			if i+1 == inputLen {
+				_, err = str.WriteString(val)
+				if err != nil {
+					return "", err
+				}
+			} else {
+				_, err = str.WriteString(val + ",")
+				if err != nil {
+					return "", err
+				}
 			}
 		}
 	case map[string]interface{}:
@@ -194,22 +203,36 @@ func serialize(input interface{}) (string, error) {
 			return keys[i] < keys[j]
 		})
 
-		for _, k := range keys {
+		for i, k := range keys {
 			v := inputVal[k]
-
-			_, err := str.WriteString(k)
-			if err != nil {
-				return "", err
-			}
 
 			val, err := serialize(v)
 			if err != nil {
 				return "", err
 			}
 
-			_, err = str.WriteString(val)
-			if err != nil {
-				return "", err
+			if _, ok := v.(map[string]interface{}); ok {
+				_, err = str.WriteString(k + ".")
+				if err != nil {
+					return "", err
+				}
+			} else {
+				_, err = str.WriteString(k + ":")
+				if err != nil {
+					return "", err
+				}
+			}
+
+			if i+1 == inputLen {
+				_, err = str.WriteString(val)
+				if err != nil {
+					return "", err
+				}
+			} else {
+				_, err = str.WriteString(val + "|")
+				if err != nil {
+					return "", err
+				}
 			}
 		}
 	case float64:
