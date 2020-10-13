@@ -5,6 +5,7 @@ import (
 	"crypto/sha1"
 	"encoding/hex"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io"
 	"log"
@@ -14,7 +15,27 @@ import (
 	"strings"
 )
 
+const DELIM_JSON_ITEM = "|"
+const DELIM_JSON_ARRAY = ","
+const DELIM_JSON_OBJECT = "."
+const DELIM_JSON_KEY_VAL = ":"
+
+var inputFilename = flag.String("input", "", "Path to HAR file")
+var requestUrl = flag.String("url", "", "URL of WebSocket server")
+
 func main() {
+	flag.Parse()
+
+	if *inputFilename == "" {
+		fmt.Fprint(os.Stderr, "Please path to HAR file\n")
+		return
+	}
+
+	if *requestUrl == "" {
+		fmt.Fprint(os.Stderr, "Please provide WebSocket server URL\n")
+		return
+	}
+
 	type entry struct {
 		ResourceType string `json:"_resourceType"`
 		Request      struct {
@@ -23,7 +44,7 @@ func main() {
 		WSMessages json.RawMessage `json:"_webSocketMessages"`
 	}
 
-	harFile, err := os.Open("localhost.har")
+	harFile, err := os.Open(*inputFilename)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -57,8 +78,8 @@ func main() {
 					log.Fatal(err)
 				}
 
-				// TODO: more check like request URL, response code, etc.
-				if e.ResourceType == "websocket" {
+				// TODO: more check like response code, etc.
+				if e.ResourceType == "websocket" && e.Request.Url == *requestUrl {
 					result, err = convertWsMessages(e.WSMessages)
 					if err != nil {
 						log.Fatal(err)
@@ -175,7 +196,7 @@ func serialize(input interface{}) (string, error) {
 					return "", err
 				}
 			} else {
-				_, err = str.WriteString(val + ",")
+				_, err = str.WriteString(val + DELIM_JSON_ARRAY)
 				if err != nil {
 					return "", err
 				}
@@ -212,12 +233,12 @@ func serialize(input interface{}) (string, error) {
 			}
 
 			if _, ok := v.(map[string]interface{}); ok {
-				_, err = str.WriteString(k + ".")
+				_, err = str.WriteString(k + DELIM_JSON_OBJECT)
 				if err != nil {
 					return "", err
 				}
 			} else {
-				_, err = str.WriteString(k + ":")
+				_, err = str.WriteString(k + DELIM_JSON_KEY_VAL)
 				if err != nil {
 					return "", err
 				}
@@ -229,7 +250,7 @@ func serialize(input interface{}) (string, error) {
 					return "", err
 				}
 			} else {
-				_, err = str.WriteString(val + "|")
+				_, err = str.WriteString(val + DELIM_JSON_ITEM)
 				if err != nil {
 					return "", err
 				}
