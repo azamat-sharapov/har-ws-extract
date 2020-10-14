@@ -22,6 +22,11 @@ const DELIM_JSON_KEY_VAL = ":"
 
 var inputFilename = flag.String("input", "", "Path to HAR file")
 var requestUrl = flag.String("url", "", "URL of WebSocket server")
+var matcherKey = flag.String(
+	"matcher-key",
+	"",
+	"JSON object item key used as request and response message matcher",
+)
 
 func main() {
 	flag.Parse()
@@ -30,9 +35,12 @@ func main() {
 		fmt.Fprint(os.Stderr, "Please path to HAR file\n")
 		return
 	}
-
 	if *requestUrl == "" {
 		fmt.Fprint(os.Stderr, "Please provide WebSocket server URL\n")
+		return
+	}
+	if *matcherKey == "" {
+		fmt.Fprint(os.Stderr, "Please provide matcher key\n")
 		return
 	}
 
@@ -46,7 +54,8 @@ func main() {
 
 	harFile, err := os.Open(*inputFilename)
 	if err != nil {
-		panic(err.Error())
+		fmt.Fprint(os.Stderr, "Could not open HAR file: %s\n", err.Error())
+		return
 	}
 
 	var result map[string]string
@@ -127,7 +136,7 @@ func convertWsMessages(wsMessages json.RawMessage) (map[string]string, error) {
 			return pairs, err
 		}
 
-		id, ok := data["id"]
+		sendMatcher, ok := data[*matcherKey]
 		if !ok {
 			continue
 		}
@@ -155,13 +164,13 @@ func convertWsMessages(wsMessages json.RawMessage) (map[string]string, error) {
 				return pairs, err
 			}
 
-			receiveId, ok := receiveData["id"]
+			receiveMatcher, ok := receiveData[*matcherKey]
 			if !ok {
 				continue
 			}
 
-			if receiveId == id {
-				delete(receiveData, "id")
+			if receiveMatcher == sendMatcher {
+				delete(receiveData, *matcherKey)
 
 				jsonStr, err := json.Marshal(receiveData)
 				if err != nil {
@@ -204,7 +213,7 @@ func serialize(input interface{}) (string, error) {
 		}
 	case map[string]interface{}:
 		inputLen := len(inputVal)
-		if _, ok := inputVal["id"]; ok {
+		if _, ok := inputVal[*matcherKey]; ok {
 			inputLen--
 		}
 
@@ -212,8 +221,8 @@ func serialize(input interface{}) (string, error) {
 
 		i := 0
 		for k, _ := range inputVal {
-			// exclude id from serialization
-			if k == "id" {
+			// exclude matcher from serialization
+			if k == *matcherKey {
 				continue
 			}
 			keys[i] = k
